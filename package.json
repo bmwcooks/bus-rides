@@ -1,0 +1,12 @@
+{
+  "name": "bus-rides",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev --port 8787 --ip 127.0.0.1",
+    "deploy": "wrangler deploy",
+    "test": "node scripts/test-api.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.40.0"
+  }
+}
