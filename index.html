@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10231c">
+  <title>Bus rides</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2310231c'/%3E%3Crect x='6' y='8' width='20' height='14' rx='3' fill='%23f5c400'/%3E%3Ccircle cx='11' cy='24' r='2' fill='%23f6f3ec'/%3E%3Ccircle cx='21' cy='24' r='2' fill='%23f6f3ec'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --ink: #10231c;
+      --paper: #f6f3ec;
+      --muted: #5c675f;
+      --line: #e2dcd0;
+      --yellow: #f5c400;
+      --yellow-press: #dfb200;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+    }
+
+    body {
+      min-height: 100dvh;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--ink);
+      color: var(--paper);
+      padding: 1.25rem 1.25rem 1.1rem;
+    }
+
+    header p {
+      margin: 0 0 0.2rem;
+      font-size: 0.75rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      opacity: 0.7;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    main {
+      flex: 1;
+      width: min(100%, 28rem);
+      margin: 0 auto;
+      padding: 1.5rem 1.25rem 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .label {
+      margin: 0.5rem 0 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .count {
+      margin: 0.15rem 0 1.5rem;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      font-weight: 760;
+      font-size: clamp(6.5rem, 32vw, 9.5rem);
+      line-height: 0.9;
+      letter-spacing: -0.05em;
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #add {
+      border: 0;
+      border-radius: 999px;
+      min-height: 4.5rem;
+      background: var(--yellow);
+      color: var(--ink);
+      font-size: 1.35rem;
+      font-weight: 750;
+      box-shadow: 0 1px 0 rgba(16, 35, 28, 0.18);
+    }
+
+    #add:hover { background: var(--yellow-press); }
+    #add:active { transform: translateY(1px); }
+    #add:focus-visible {
+      outline: 3px solid var(--ink);
+      outline-offset: 3px;
+    }
+
+    #undo {
+      margin-top: 0.85rem;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      min-height: 3rem;
+      font-size: 1.05rem;
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+    }
+
+    #undo:hover:not(:disabled) { color: var(--ink); }
+    #undo:focus-visible {
+      outline: 3px solid var(--ink);
+      outline-offset: 3px;
+      border-radius: 8px;
+    }
+
+    #undo:disabled {
+      opacity: 0.35;
+      cursor: default;
+      text-decoration: none;
+    }
+
+    .hint {
+      margin: auto 0 0;
+      padding-top: 2rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--line);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p>Counter</p>
+    <h1>Bus rides</h1>
+  </header>
+  <main>
+    <p class="label">Times you’ve taken the bus</p>
+    <p class="count" id="count" aria-live="polite">0</p>
+    <button type="button" id="add">Took the bus</button>
+    <button type="button" id="undo">Undo</button>
+    <p class="hint">Saved in this browser. Nothing is sent anywhere.</p>
+  </main>
+  <script>
+    (function () {
+      var KEY = "bus-rides";
+      var countEl = document.getElementById("count");
+      var addBtn = document.getElementById("add");
+      var undoBtn = document.getElementById("undo");
+      var count = 0;
+
+      function read() {
+        try {
+          var n = parseInt(localStorage.getItem(KEY), 10);
+          if (!isFinite(n) || n < 0) return 0;
+          return Math.floor(n);
+        } catch (err) {
+          return 0;
+        }
+      }
+
+      function render(next) {
+        count = next < 0 ? 0 : next;
+        countEl.textContent = String(count);
+        undoBtn.disabled = count === 0;
+        try {
+          localStorage.setItem(KEY, String(count));
+        } catch (err) {
+          /* Private mode or blocked storage: keep the count for this visit. */
+        }
+      }
+
+      render(read());
+
+      addBtn.addEventListener("click", function () {
+        render(count + 1);
+      });
+
+      undoBtn.addEventListener("click", function () {
+        render(count - 1);
+      });
+    })();
+  </script>
+</body>
+</html>
