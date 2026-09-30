@@ -1,0 +1,13 @@
+name = "bus-rides"
+main = "worker/src/index.js"
+compatibility_date = "2026-09-30"
+
+# One SQLite Durable Object holds the count. KV cannot do an atomic +1,
+# and new Durable Object namespaces must use the SQLite backend.
+[[durable_objects.bindings]]
+name = "COUNTER"
+class_name = "BusCounter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["BusCounter"]

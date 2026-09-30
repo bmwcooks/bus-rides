@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#10231c">
+  <!-- After `npx wrangler deploy`, paste the printed workers.dev URL here. -->
+  <meta name="bus-rides-api" content="">
   <title>Bus rides</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2310231c'/%3E%3Crect x='6' y='8' width='20' height='14' rx='3' fill='%23f5c400'/%3E%3Ccircle cx='11' cy='24' r='2' fill='%23f6f3ec'/%3E%3Ccircle cx='21' cy='24' r='2' fill='%23f6f3ec'/%3E%3C/svg%3E">
   <style>
@@ -137,6 +139,19 @@
       font-size: 0.85rem;
       border-top: 1px solid var(--line);
     }
+
+    .error {
+      min-height: 1.25rem;
+      margin: 0.85rem 0 0;
+      text-align: center;
+      color: #8a2b1d;
+      font-size: 0.95rem;
+    }
+
+    #add:disabled {
+      opacity: 0.55;
+      cursor: default;
+    }
   </style>
 </head>
 <body>
@@ -146,49 +161,126 @@
   </header>
   <main>
     <p class="label">Times you’ve taken the bus</p>
-    <p class="count" id="count" aria-live="polite">0</p>
+    <p class="count" id="count" aria-live="polite">…</p>
     <button type="button" id="add">Took the bus</button>
     <button type="button" id="undo">Undo</button>
-    <p class="hint">Saved in this browser. Nothing is sent anywhere.</p>
+    <p class="error" id="error" hidden></p>
+    <p class="hint">Saved on the server, for every device.</p>
   </main>
   <script>
     (function () {
-      var KEY = "bus-rides";
+      var CACHE_KEY = "bus-rides-last";
       var countEl = document.getElementById("count");
       var addBtn = document.getElementById("add");
       var undoBtn = document.getElementById("undo");
-      var count = 0;
+      var errorEl = document.getElementById("error");
+      var busy = false;
+      var count = null;
 
-      function read() {
+      function apiBase() {
+        var host = location.hostname;
+        if (host === "localhost" || host === "127.0.0.1") return "http://127.0.0.1:8787";
+        var meta = document.querySelector('meta[name="bus-rides-api"]');
+        return meta && meta.content ? meta.content.replace(/\/$/, "") : "";
+      }
+
+      function readCache() {
         try {
-          var n = parseInt(localStorage.getItem(KEY), 10);
-          if (!isFinite(n) || n < 0) return 0;
+          var n = parseInt(localStorage.getItem(CACHE_KEY), 10);
+          if (!isFinite(n) || n < 0) return null;
           return Math.floor(n);
         } catch (err) {
-          return 0;
+          return null;
         }
+      }
+
+      function writeCache(n) {
+        try {
+          localStorage.setItem(CACHE_KEY, String(n));
+        } catch (err) {
+          /* Cache is only a display hint when the server is unreachable. */
+        }
+      }
+
+      function showError(message) {
+        errorEl.hidden = !message;
+        errorEl.textContent = message || "";
       }
 
       function render(next) {
-        count = next < 0 ? 0 : next;
-        countEl.textContent = String(count);
-        undoBtn.disabled = count === 0;
-        try {
-          localStorage.setItem(KEY, String(count));
-        } catch (err) {
-          /* Private mode or blocked storage: keep the count for this visit. */
-        }
+        count = next;
+        countEl.textContent = next === null ? "…" : String(next);
+        undoBtn.disabled = busy || next === null || next === 0;
+        addBtn.disabled = busy || next === null && !apiBase();
       }
 
-      render(read());
+      function setBusy(next) {
+        busy = next;
+        addBtn.disabled = busy || (count === null && !apiBase());
+        undoBtn.disabled = busy || count === null || count === 0;
+      }
 
-      addBtn.addEventListener("click", function () {
-        render(count + 1);
-      });
+      function call(path, method) {
+        var base = apiBase();
+        if (!base) {
+          return Promise.reject(new Error("missing api"));
+        }
+        return fetch(base + path, {
+          method: method,
+          headers: { Accept: "application/json" }
+        }).then(function (res) {
+          if (!res.ok) throw new Error("status " + res.status);
+          return res.json();
+        }).then(function (body) {
+          var n = Number(body && body.count);
+          if (!isFinite(n) || n < 0) throw new Error("bad count");
+          return Math.floor(n);
+        });
+      }
 
-      undoBtn.addEventListener("click", function () {
-        render(count - 1);
-      });
+      function apply(n) {
+        render(n);
+        writeCache(n);
+        showError("");
+      }
+
+      function fail(message) {
+        showError(message);
+        setBusy(false);
+      }
+
+      function refresh() {
+        setBusy(true);
+        call("/count", "GET").then(function (n) {
+          setBusy(false);
+          apply(n);
+        }).catch(function () {
+          fail(apiBase()
+            ? "Couldn’t reach the counter."
+            : "The counter server isn’t set up yet.");
+        });
+      }
+
+      function change(path) {
+        if (busy) return;
+        setBusy(true);
+        showError("");
+        call(path, "POST").then(function (n) {
+          setBusy(false);
+          apply(n);
+        }).catch(function () {
+          fail("Couldn’t save that. Check your connection and try again.");
+        });
+      }
+
+      var cached = readCache();
+      render(cached);
+      addBtn.disabled = true;
+      undoBtn.disabled = true;
+
+      addBtn.addEventListener("click", function () { change("/increment"); });
+      undoBtn.addEventListener("click", function () { change("/decrement"); });
+      refresh();
     })();
   </script>
 </body>
